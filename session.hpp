@@ -9,6 +9,7 @@ using boost::asio::ip::tcp;
 namespace twime
 {
 enum Status {DISCONNECTED=0, CONNECTING=1, CONNECTED=2, AUTHORIZED=3, DISCONNECTING=4};
+
 class Session{
    Status status;
    //Timer timer;
@@ -21,6 +22,11 @@ class Session{
    //, timer(100)
    , service()
    , sock(service){
+       service.run();
+   }
+   
+   ~Session(){
+       service.stop();
    }
    
    int connect(const std::string& ip, const unsigned int& port){
@@ -38,10 +44,10 @@ class Session{
          //CommandTerminate term;
          //sock.sendCommand(term);
          sock.close();
+         status = Status::DISCONNECTED;
       }
       return 0;
-   }
-   
+   }   
    
    bool isRunning(){
        return status != Status::DISCONNECTED;

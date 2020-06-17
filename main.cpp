@@ -14,11 +14,11 @@ void handler(int){
 int main(int argc, char **argv) {
     signal(SIGKILL, handler);
     signal(SIGINT, handler);
-    if (argc != 3){
-        std::cerr << "Usage:" << argv[0] << "<ip> <port>" << std::endl;
+    if (argc != 4){
+        std::cerr << "Usage:" << argv[0] << "<pass> <ip> <port>" << std::endl;
         return -1;
     }
-    connector.connect(std::string(argv[1]), atoi(argv[2]));
+    connector.connect(std::string(argv[2]), atoi(argv[3]));
     while(connector.isRunning())
         sleep(1);    
     return 0;

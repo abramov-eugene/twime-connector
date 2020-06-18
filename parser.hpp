@@ -3,6 +3,7 @@
 #include <memory>
 #include "messages.hpp"
 #include "parserutils.hpp"
+#include "types.hpp"
 
 namespace twime{
 

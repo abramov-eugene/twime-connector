@@ -51,6 +51,8 @@ class Session{
    , nextSeqNum(0)
    , lastRecv(0)
    , keepAliveServer(0)/*get from Establish Ack*/{
+       memset(sendBuff, 0, MAX_BUFF_SIZE);
+       memset(recvBuff, 0, MAX_RECV_SIZE);
    }
    
    ~Session(){
@@ -128,7 +130,7 @@ class Session{
        return 0;
    }
    
-   int sendCommand(const FixMessage* command){
+   int sendCommand(FixMessage* command){
       if (status == Status::AUTHORIZED){  
           int len = command->encode(sendBuff, MAX_BUFF_SIZE);
           if (len > 0)

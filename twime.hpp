@@ -7,19 +7,25 @@ namespace twime
 {
 class TwimeConnector{
 
-   Session session;
+ 
+    Session session;
     
    public:
-      TwimeConnector() : session()
-      {}
-      
-      int connect(const std::string& ip, const unsigned int& port){
-          return session.connect(ip, port);
-      }
+    TwimeConnector() 
+    : session()
+    {}
 
-      int disconnect(){
+    void setUser(const std::string mUser){
+         session.setUser(mUser);
+    }
+
+    int connect(const std::string& mIp, const unsigned int& mPort){
+          return session.connect(mIp, mPort);
+    }
+
+    int disconnect(){
           return session.disconnect();
-      }
+    }
       
       bool isRunning(){
           return session.isRunning();

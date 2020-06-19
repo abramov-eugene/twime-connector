@@ -18,6 +18,7 @@ int main(int argc, char **argv) {
         std::cerr << "Usage:" << argv[0] << "<pass> <ip> <port>" << std::endl;
         return -1;
     }
+    connector.setUser(std::string(argv[1]));
     connector.connect(std::string(argv[2]), atoi(argv[3]));
     while(connector.isRunning())
         sleep(1);    

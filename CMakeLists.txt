@@ -1,20 +1,24 @@
 cmake_minimum_required(VERSION 3.0)
-set(BOOST_ROOT /usr/include/boost)
+set(BOOST_ROOT /usr)
+#set(BOOST_INCLUDEDIR /usr/include)
+#set(BOOST_LIBRARYDIR /usr/lib/x86_64-linux-gnu)
+set(PROJECT twime)
+set(BOOST_COMPONENTS thread system)
+set(BOOST_USE_STATIC_LIBS ON)
+set(BOOST_USE_MULTITHREADED ON)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-project(twime CXX)
 
-find_package(Boost 1.71.0 REQUIRED)
+project(${PROJECT})
+
+find_package(Boost COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
 find_package(Threads)
+if(Boost_FOUND)
+   include_directories(${Boost_INCLUDE_DIRS})
+   add_executable(${PROJECT} main.cpp)
+   target_link_libraries(${PROJECT} ${Boost_LIBRARIES} -lpthread ${CMAKE_THREAD_LINS_INIT})
+   set_property(TARGET ${PROJECT}  PROPERTY COMPILE_OPETIONS "-pthread")
+endif()
 
-
-include_directories(${Boost_INCLUDE_DIRS})
-
-add_executable(twime main.cpp)
-
-target_link_libraries(twime ${Boost_LIBRARIES} -pthread ${CMAKE_THREAD_LINS_INIT})
-set_property(TARGET twime  PROPERTY COMPILE_OPETIONS "-pthread")
-
-
-install(TARGETS twime RUNTIME DESTINATION bin)
+#install(TARGETS twime RUNTIME DESTINATION bin)

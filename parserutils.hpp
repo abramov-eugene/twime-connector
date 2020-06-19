@@ -9,11 +9,11 @@ using namespace std;
 struct ParserUtils{
         
     template<class T>
-    static size_t unpack(const char* buff, const size_t maxLen, const size_t offset, T* value){
-        if (offset + sizeof(T) > maxLen){
-            return 0;
-        }
-        memcpy(value, buff + offset, sizeof(T));
+    static size_t unpack(const char* buff, const size_t maxLen, const size_t offset, T& value){
+        //if (offset + sizeof(T) > maxLen){
+        //    return 0;
+        //}
+        memcpy(&value, buff + offset, sizeof(T));
         return offset + sizeof(T);
     }
     
@@ -31,7 +31,7 @@ struct ParserUtils{
         const size_t len = str.size();
         if (len > N || offset + N >= maxLen)
             return 0;        
-        memcpy(buff + offset, (temp), len);
+        memcpy(buff + offset, temp, len);
         memset(buff + offset + len, 0, std::max<int>(0,N-len));
         return offset + N;
     }

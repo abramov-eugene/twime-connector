@@ -26,7 +26,7 @@ public:
    }
    
    void setLengthMessage(unsigned int len){
-       blockLength = 64 + len;
+       blockLength = len;
    }
    
    virtual int decode(const char *buff, const size_t size) = 0; //parsing
@@ -44,7 +44,7 @@ public:
            return 0;
        offset = ParserUtils::pack<uint16>(buff, maxLen - offset, offset, version);       
        return offset;      
-   }//make message
+   }
     
     
 };
@@ -56,9 +56,10 @@ public:
 };*/
 
 class Establish : public FixMessage{
+    timestamp_t timestamp;
     uint32 keepAlive;
     std::string userName;
-    timestamp_t timestamp;
+    
 public:
     Establish() 
     : FixMessage(FixMessageType::ESTABLISH)
@@ -75,15 +76,15 @@ public:
     }
     
     size_t encode(char* buff, const size_t len){
-        setLengthMessage(96+20);
+        setLengthMessage(12+20);
         size_t offset = FixMessage::encode(buff, len);
+        offset += ParserUtils::pack<timestamp_t>(buff, len, offset, timestamp);
+        if (offset == 0)
+            return 0;        
         offset += ParserUtils::pack<uint32>(buff, len, offset, keepAlive);
         if (offset == 0)
             return 0;
         offset += ParserUtils::packChar(buff, len, offset, userName, 20);
-        if (offset == 0)
-            return 0;
-        offset += ParserUtils::pack<timestamp_t>(buff, len, offset, timestamp);
         return offset;
     }
     
@@ -116,13 +117,13 @@ public:
     
     int decode(const char *buff, const size_t size){
         size_t offset = 4 * sizeof(uint16); 
-        offset = ParserUtils::unpack<timestamp_t>(buff, size, offset, &reqTimestamp);
+        offset = ParserUtils::unpack<timestamp_t>(buff, size, offset, reqTimestamp);
         if (offset == 0)
             return -1;
-        offset = ParserUtils::unpack<uint32>(buff, size, offset, &keepAlive);
+        offset = ParserUtils::unpack<uint32>(buff, size, offset, keepAlive);
         if (offset == 0)
             return -1;
-        offset = ParserUtils::unpack<uint64>(buff, size, offset, &nextSeqNum);
+        offset = ParserUtils::unpack<uint64>(buff, size, offset, nextSeqNum);
         return offset;
     }
 };
@@ -141,7 +142,7 @@ public:
     }
     
     size_t encode(char* buff, const size_t len){
-        setLengthMessage(8);
+        setLengthMessage(1);
         size_t offset = FixMessage::encode(buff, len);
         offset += ParserUtils::pack<uint8>(buff, len, offset, terminationCode);
         return offset;
@@ -153,8 +154,8 @@ public:
 };
 
 class EstablishmentReject: public FixMessage{
-    long reqTimestamp;
-    unsigned int rejectCode;
+    timestamp_t reqTimestamp;
+    uint8 rejectCode;
 public:
     
     EstablishmentReject()
@@ -163,18 +164,27 @@ public:
     , rejectCode(0){        
     }
     
-    EstablishmentReject(long mReqTimestamp, unsigned int mRejectCode)
+    EstablishmentReject(timestamp_t mReqTimestamp, uint8 mRejectCode)
     : FixMessage(FixMessageType::ESTABLISHMENT_REJECT)
     , reqTimestamp(mReqTimestamp)
     , rejectCode(mRejectCode){        
+    }
+    
+    uint8 getRejectCode() const {
+        return rejectCode;
     }
     
     size_t encode(char*, const size_t){
         return 0;
     }
     
-    int decode(const char *, const size_t){
-        return 0;
+    int decode(const char *buff, const size_t size){
+        size_t offset = 4 * sizeof(uint16); 
+        offset = ParserUtils::unpack<timestamp_t>(buff, size, offset, reqTimestamp);
+        if (offset == 0)
+            return -1;
+        offset = ParserUtils::unpack<uint8>(buff, size, offset, rejectCode);
+        return offset;
     }
 };
 
@@ -192,7 +202,7 @@ class Sequence : public FixMessage{
     }
     
     size_t encode(char* buff, const size_t len){
-        setLengthMessage(64);
+        setLengthMessage(8);
         size_t offset = FixMessage::encode(buff, len);
         offset += ParserUtils::pack<uint64>(buff, len, offset, nextSeqNum);
         return offset;

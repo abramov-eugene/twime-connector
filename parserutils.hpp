@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include <string>
 #include <cstring>
 
@@ -19,11 +20,11 @@ struct ParserUtils{
     
     template<class T>
     static size_t pack(char*buff, const size_t maxLen, const size_t offset, const T value){
-       if (offset+sizeof(T) >= maxLen){
-           return 0;
-       }
-       memcpy(buff+offset,(&value), sizeof(T));
-       return offset+sizeof(T);
+        if (offset+sizeof(T) >= maxLen){
+            return 0;
+        }
+        memcpy(buff+offset,(&value), sizeof(T));
+        return offset+sizeof(T);
     }
     
     static size_t packChar(char* buff ,const size_t maxLen, const size_t offset, const std::string str, const size_t N = 20){

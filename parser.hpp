@@ -23,24 +23,24 @@ class Parser{
         uint16 version = 0;
         size_t offset = 0;
         offset = ParserUtils::unpack<uint16>(buff, len, offset, msgLen);
-        std::cout << "MsgLen:" << msgLen << ":" << offset <<  std::endl;
         if (offset == 0)
-           //onError();
+           //handler.onError("Can't parse length of message");
            return -1;
         if (msgLen + headerLen < len)
         {
-            return 0; //need to wait the whole packet
+            //handler.onError("Not full data-packet was received");
+            return 0;
         }
         offset = ParserUtils::unpack<uint16>(buff,len,offset,templateId);
         std::cout << "TemplateId:" << templateId << std::endl;
         offset = ParserUtils::unpack<uint16>(buff,len,offset,schemaId);
         if (schemaId != FixMessage::schemaId){
-            //onError
+            //handler.onError("Unknown schemaId");
             return -1;
         }
         offset = ParserUtils::unpack<uint16>(buff,len,offset,version);
         if (version != FixMessage::version){
-            //onError
+            //handler.onError("Unknown protocol version");
             return -1;
         }
         switch(templateId){
@@ -57,7 +57,7 @@ class Parser{
                 decode<Sequence>(buff, msgLen);
                 break;
             default:
-                handler.onError("Unknown type message");
+                //handler.onError("Unknown type of message");
                 return -1;
                 break;                
         }        

@@ -15,11 +15,11 @@ class TwimeConnector{
     : session()
     {}
 
-    void setUser(const std::string mUser){
+    void setUser(const string mUser){
          session.setUser(mUser);
     }
 
-    int connect(const std::string& mIp, const unsigned int& mPort){
+    int connect(const string& mIp, const unsigned int& mPort){
           return session.connect(mIp, mPort);
     }
 
@@ -31,8 +31,5 @@ class TwimeConnector{
           return session.isRunning();
     }
 
-      //int sendCommand(const CommandNos& nos){
-      //    return session.sendCommand(nos);
-    //}
 };
 };

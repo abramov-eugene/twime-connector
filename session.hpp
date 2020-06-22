@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <fstream>
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -8,6 +9,7 @@
 #include "parser.hpp"
 using boost::asio::ip::address;
 using boost::asio::ip::tcp;
+using namespace std;
 
 namespace twime
 {
@@ -19,13 +21,13 @@ class Session{
    boost::asio::deadline_timer timer;
    tcp::socket sock;
    boost::thread serviceThread;
-   static const size_t MAX_BUFF_SIZE = 8 * 2048;
-   static const size_t MAX_RECV_SIZE = 2048;
-   
-   char sendBuff[MAX_BUFF_SIZE];
-   char recvBuff[MAX_RECV_SIZE];
-   std::string userName;
+   static const size_t MAX_BUFF_SIZE = 2048;
+   static const size_t MAX_RECV_SIZE = 2048;   
+   char* sendBuff;
+   char* recvBuff;
+   string userName;
    unsigned int keepAlive;
+   long reestablishTimeoutSec;
    long reconnectTimeoutSec;
    long lastConnecting;
    long lastEstablish;
@@ -35,54 +37,64 @@ class Session{
    long lastRecv;
    unsigned int keepAliveServer;
    Parser<Session> parser;
-   std::string ip;
+   string ip;
    unsigned int port;
+   std::ofstream outStream;
    public:
    Session() 
    : status(Status::DISCONNECTED)
-   //, timer(100)
    , service()
    , timer(service, boost::posix_time::seconds(2))
    , sock(service)
    , serviceThread(boost::bind(&boost::asio::io_service::run, &service))
+   , sendBuff(nullptr)
+   , recvBuff(nullptr)
    , userName("")
    , keepAlive(10000)
    , reconnectTimeoutSec(60)
-   , lastConnecting(DateTimeUtils::now(-reconnectTimeoutSec))
-   , lastEstablish(DateTimeUtils::now(-30))
-   , lastSended(DateTimeUtils::now(-30))
+   , reestablishTimeoutSec(5)
+   , lastConnecting(DateTimeUtils::now())
+   , lastEstablish(DateTimeUtils::now())
+   , lastSended(DateTimeUtils::now())
    , nextSeqNum(0)
    , sendSeqNum(UINT64_MAX)
-   , lastRecv(DateTimeUtils::now(-30))
+   , lastRecv(DateTimeUtils::now())
    , keepAliveServer(30000)/*get from Establish Ack*/
    , parser(*this)
    , ip("")
    , port(0)
+   , outStream()
    {
-       memset(sendBuff, 0, MAX_BUFF_SIZE);
-       memset(recvBuff, 0, MAX_RECV_SIZE);
+       sendBuff = new char [MAX_BUFF_SIZE];
+       recvBuff = new char [MAX_RECV_SIZE];
        timer.async_wait(boost::bind(&Session::onTimer, this));
+       outStream.open("twime.log", std::ofstream::out);
    }
    
    ~Session(){
        timer.cancel();
        service.stop();
        serviceThread.join();
+       outStream.close();
+       if (sendBuff)
+           delete [] sendBuff;
+       if (recvBuff)
+           delete [] recvBuff;
    }
    
-    void setUser(const std::string& mUser){
+    void setUser(const string& mUser){
         userName = mUser;
     }
     
-    void log(const std::string msg){
-        time_t t = time(nullptr);
-        std::cout   << "[" << t << "]" << msg << std::endl;
+    void log(const string& msg){
+        outStream << "[" << time(nullptr) << "]" << msg << endl;
     }
 
    void onTimer(){
+        timestamp_t now = DateTimeUtils::now();
         switch (status){
             case Status::CONNECTING:{
-                if (lastConnecting < DateTimeUtils::now(-reconnectTimeoutSec)){
+                if (DateTimeUtils::delta(now, lastConnecting) > reconnectTimeoutSec){
                     tcp::endpoint endpoint(address::from_string(ip),port);
                     log("Connect:" + ip + ":" + std::to_string(port));
                     sock.connect(endpoint);
@@ -90,11 +102,12 @@ class Session{
                 }
                 if (sock.is_open()){
                     status = Status::CONNECTED;
+                    init_read();
                 }
                 break;
             }
             case Status::CONNECTED:{
-                if (lastEstablish < DateTimeUtils::now(-5)){
+                if (DateTimeUtils::delta(now, lastEstablish) > reestablishTimeoutSec){
                     log("Establish sended");
                     Establish est(keepAlive, userName);
                     sendCommand(&est);
@@ -103,18 +116,17 @@ class Session{
                 break;
             }
             case Status::AUTHORIZED:{
-                if (lastSended < DateTimeUtils::now(-keepAlive/1000)){
+                timestamp_t now = DateTimeUtils::now();
+                if (DateTimeUtils::delta(now, lastSended) > keepAlive/1000){
                     log("Heartbeat sended");
                     Sequence seq(sendSeqNum);
                     sendCommand(&seq);
-                    lastSended = DateTimeUtils::now();
-                    //sendSeqNum ++;
+                    lastSended = DateTimeUtils::now();                    
                 }
-                /*if (keepAliveServer != 0 && lastRecv < DateTimeUtils::now(-keepAliveServer/1000)){
-                    log("Heartbeat from server");
-                    sock.close();
-                    status = Status::DISCONNECTED;
-                }*/
+                if (keepAliveServer != 0 && DateTimeUtils::delta(now, lastRecv) >2*keepAliveServer/1000){
+                    log("Heartbeat from server missed");
+                    close();
+                }
                 break;
             }
             case Status::DISCONNECTING:{
@@ -131,7 +143,7 @@ class Session{
         timer.async_wait(boost::bind(&Session::onTimer, this));
     }
    
-   int connect(const std::string& mIp, const unsigned int& mPort){
+   int connect(const string& mIp, const unsigned int& mPort){
         port = mPort;
         ip = mIp;         
         if (status == Status::DISCONNECTED){         
@@ -142,27 +154,29 @@ class Session{
    }
    
    int disconnect(){
-      if (status == Status::AUTHORIZED){
-         Terminate term(0);
-         sendCommand(&term);
-         log("Terminate sended");
-      }
-      else if (status == Status::CONNECTED){
-          sock.close();
-      }
-      status = Status::DISCONNECTING;
-      return 0;
+        log("Disconnect");
+        if (status == Status::AUTHORIZED){
+            Terminate term(0);
+            sendCommand(&term);
+            log("Terminate sended");
+        }
+        else if (status == Status::CONNECTED 
+                || status == Status::CONNECTING){
+            boost::system::error_code ignored;                    
+            sock.close(ignored);
+        }        
+        status = Status::DISCONNECTING;
+        return 0;
    }
    
    bool isRunning(){
-       return status != Status::DISCONNECTED && status != Status::DISCONNECTING;
+       return status != Status::DISCONNECTED;
    }
 
    int send(const char *buff, const int len){
        printBuff(">>", buff, len);
        boost::asio::write(sock, boost::asio::buffer(buff, len));
        lastSended = DateTimeUtils::now();
-       init_read();
        return 0;
    }
    
@@ -179,33 +193,39 @@ class Session{
         return -1;
    }
 
-    void onError(const std::string& error){
+    void onError(const string error){
         log("Error message parsing:" + error);
     }    
     
-    void onMessage(const std::shared_ptr<EstablishmentReject> reject){        
-        log("EstalishReject received. Reject:" + std::to_string(reject->getRejectCode()));
+    void onMessage(const shared_ptr<EstablishmentReject> reject){        
+        log("EstalishReject received. Reject:" + to_string(reject->getRejectCode()));
         disconnect();
     }
     
-    void onMessage(const std::shared_ptr<Sequence>){
+    void onMessage(const shared_ptr<Sequence>){
         log("Heartbeat received");
     }
     
-    void onMessage(const std::shared_ptr<Terminate> msg){
-        log("Terminate received: " + std::to_string(msg->getTerminationCode()));
-        status = Status::DISCONNECTED;
-        sock.close();
+    void onMessage(const shared_ptr<Terminate> msg){
+        log("Terminate received: " + to_string(msg->getTerminationCode()));
+        close();
     }
     
-    void onMessage(const std::shared_ptr<EstablishmentAck> msg){        
+    void onMessage(const shared_ptr<EstablishmentAck> msg){        
         status = Status::AUTHORIZED;
         keepAliveServer = msg->getKeepAlive();
         nextSeqNum = msg->getNextSeqNum();
-        log("EstablishmentAck received ");// + std::to_string(nextSeqNum) + "/" + std::to_string(keepAliveServer));
+        log("EstablishmentAck received: " + to_string(keepAliveServer) );
     }
     
 private:
+    
+    void close(){
+        status = Status::DISCONNECTED;
+        boost::system::error_code ignored;
+        if (sock.is_open())
+            sock.close(ignored);        
+    }
     
     void printBuff(const char* temp, const char *buff, int len){
         if (len == 0)
@@ -213,7 +233,6 @@ private:
         std::cout << temp << "Buff(" << len << "):";
         for(int i = 0; i< len;++i){
             unsigned char c = buff[i];
-            //std::cout << << std::setfill('0') << std::setw(2) << c << ":";
             std::cout << std::setfill('0') << std::setw(2) << static_cast<uint16>(c) << ":";
         }
         std::cout << std::endl;
@@ -221,7 +240,6 @@ private:
     
     void onRead(const boost::system::error_code& error, size_t bytes){
         lastRecv = DateTimeUtils::now();
-        std::cout << "onRead:" << error << " len:" << bytes << std::endl;
         printBuff("<<", recvBuff, bytes);
         if (!error){           
             int ind = 0;
@@ -231,11 +249,10 @@ private:
                     && ind >= 0 
                     && (ind = parser.parse(recvBuff + offset, bytes-offset)) > 0){
                     offset = ind;
-                    std::cout << "parsing: " << offset << " " << ind << "" << bytes <<std::endl; 
-                };                 
+                }; 
             }
         } else {
-            log("Error: onRead error:" + std::string(error.message()) + " sock:" + std::to_string(sock.is_open()) );
+            log("Error: onRead error:" + string(error.message()) + " sock:" + to_string(sock.is_open()) );
         }
         init_read();
     }

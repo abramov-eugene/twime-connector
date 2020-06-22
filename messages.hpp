@@ -79,17 +79,13 @@ public:
     size_t encode(char* buff, const size_t len){
         setLengthMessage(12+20);
         size_t offset = FixMessage::encode(buff, len);
-        //std::cout << "Offset 1:" << offset <<std::endl;
         offset = ParserUtils::pack<timestamp_t>(buff, len, offset, timestamp);
-        //std::cout << "Offset 2:" << offset <<std::endl;
         if (offset == 0)
             return 0;
         offset = ParserUtils::pack<uint32>(buff, len, offset, keepAlive);
-        //std::cout << "Offset 3:" << offset <<std::endl;
         if (offset == 0)
             return 0;
         offset = ParserUtils::packChar(buff, len, offset, userName, 20);
-        //std::cout << "Offset 4:" << offset <<std::endl;
         return offset;
     }
     

@@ -52,7 +52,7 @@ class Session{
    , lastEstablish(DateTimeUtils::now(-30))
    , lastSended(DateTimeUtils::now(-30))
    , nextSeqNum(0)
-   , sendSeqNum(0)
+   , sendSeqNum(UINT64_MAX)
    , lastRecv(DateTimeUtils::now(-30))
    , keepAliveServer(30000)/*get from Establish Ack*/
    , parser(*this)
@@ -192,8 +192,8 @@ class Session{
         log("Heartbeat received");
     }
     
-    void onMessage(const std::shared_ptr<Terminate>){
-        log("Terminate received");
+    void onMessage(const std::shared_ptr<Terminate> msg){
+        log("Terminate received: " + std::to_string(msg->getTerminationCode()));
         status = Status::DISCONNECTED;
         sock.close();
     }

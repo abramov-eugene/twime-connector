@@ -154,6 +154,10 @@ public:
     , terminationCode(mTerminationCode){        
     }
     
+    uint8 getTerminationCode() const{
+        return terminationCode;
+    }
+    
     size_t encode(char* buff, const size_t len){
         setLengthMessage(1);
         size_t offset = FixMessage::encode(buff, len);

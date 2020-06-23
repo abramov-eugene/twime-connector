@@ -90,14 +90,20 @@ class Session{
         outStream << "[" << time(nullptr) << "]" << msg << endl;
     }
 
-   void onTimer(){
+    void onTimer(){
         timestamp_t now = DateTimeUtils::now();
         switch (status){
             case Status::CONNECTING:{
                 if (DateTimeUtils::delta(now, lastConnecting) > reconnectTimeoutSec){
                     tcp::endpoint endpoint(address::from_string(ip),port);
                     log("Connect:" + ip + ":" + std::to_string(port));
-                    sock.connect(endpoint);
+                    try{
+                        sock.connect(endpoint);
+                    }
+                    catch(const std::exception& ex){
+                        log("Connection error:" + string( ex.what()));
+                        sock.close();
+                    }
                     lastConnecting = DateTimeUtils::now();
                 }
                 if (sock.is_open()){
@@ -117,13 +123,13 @@ class Session{
             }
             case Status::AUTHORIZED:{
                 timestamp_t now = DateTimeUtils::now();
-                if (DateTimeUtils::delta(now, lastSended) > keepAlive/1000){
+                if (DateTimeUtils::delta(now, lastSended) >= (keepAlive/1000)-1){
                     log("Heartbeat sended");
                     Sequence seq(sendSeqNum);
                     sendCommand(&seq);
                     lastSended = DateTimeUtils::now();                    
                 }
-                if (keepAliveServer != 0 && DateTimeUtils::delta(now, lastRecv) >2*keepAliveServer/1000){
+                if (keepAliveServer != 0 && DateTimeUtils::delta(now, lastRecv) >=2*keepAliveServer/1000){
                     log("Heartbeat from server missed");
                     close();
                 }
@@ -181,7 +187,7 @@ class Session{
    }
    
    int sendCommand(FixMessage* command){
-        if (isRunning()){
+        if (isConnected()){
             int len = command->encode(sendBuff, MAX_BUFF_SIZE);
             if (len > 0)
                 return send(sendBuff, len);
@@ -257,8 +263,12 @@ private:
         init_read();
     }
     
+    bool isConnected(){
+        return status == Status::CONNECTED || status == Status::AUTHORIZED;
+    }
+    
     void init_read(){
-        if (sock.is_open() && isRunning()){
+        if (sock.is_open() && isConnected()){
             sock.async_read_some(boost::asio::buffer(recvBuff, MAX_RECV_SIZE), boost::bind(&Session::onRead, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
         }
     }   

@@ -236,12 +236,12 @@ private:
     void printBuff(const char* temp, const char *buff, int len){
         if (len == 0)
             return;
-        std::cout << temp << "Buff(" << len << "):";
+        outStream << temp << "Buff(" << len << "):";
         for(int i = 0; i< len;++i){
             unsigned char c = buff[i];
-            std::cout << std::setfill('0') << std::setw(2) << static_cast<uint16>(c) << ":";
+            outStream << std::setfill('0') << std::setw(2) << static_cast<uint16>(c) << ":";
         }
-        std::cout << std::endl;
+        outStream << std::endl;
     }
     
     void onRead(const boost::system::error_code& error, size_t bytes){

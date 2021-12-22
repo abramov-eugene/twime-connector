@@ -8,14 +8,14 @@
 namespace twime{
 
 template<class Handler>
-class Parser{   
+class Parser {
     Handler& handler;
     public:
     Parser(Handler& mHandler)
-    : handler(mHandler){        
+    : handler(mHandler) {
     }
     
-    int parse(const char *buff, const size_t len){
+    int parse(const char *buff, const size_t len) {
         size_t headerLen = 8;
         uint16 msgLen = 0;
         uint16 templateId = 0;
@@ -24,30 +24,32 @@ class Parser{
         size_t offset = 0;
         string msg;
         offset = ParserUtils::unpack<uint16>(buff, len, offset, msgLen);
-        if (offset == 0)
+        if (offset == 0) {
             msg = "Can't parse length of message";
-            handler.onError(msg);
+            handler.onError("Can't parse length of message");
             return -1;
+        }
+
         if (msgLen + headerLen < len)
         {
             msg = "Not full data-packet was received";
-            handler.onError(msg);
+            handler.onError("Not full data-packet was received");
             return 0;
         }
-        offset = ParserUtils::unpack<uint16>(buff,len,offset,templateId);
-        offset = ParserUtils::unpack<uint16>(buff,len,offset,schemaId);
-        if (schemaId != FixMessage::schemaId){
+        offset = ParserUtils::unpack<uint16>(buff, len, offset, templateId);
+        offset = ParserUtils::unpack<uint16>(buff, len, offset, schemaId);
+        if (schemaId != FixMessage::schemaId) {
             msg = "Unknown schemaId:" + to_string(schemaId);
-            handler.onError(msg);
+            handler.onError("Unknown schemaId");
             return -1;
         }
         offset = ParserUtils::unpack<uint16>(buff,len,offset,version);
-        if (version != FixMessage::version){
+        if (version != FixMessage::version) {
             msg = "Unknown protocol version";
-            handler.onError(msg);
+            handler.onError("Unknown protocol version");
             return -1;
         }
-        switch(templateId){
+        switch(templateId) {
             case FixMessageType::ESTABLISHMENT_ACK:
                 decode<EstablishmentAck>(buff, msgLen);
                 break;
@@ -62,17 +64,18 @@ class Parser{
                 break;
             default:
                 msg = "Unknown type of message. TemplateId:" + to_string(templateId);
-                handler.onError(msg);
+                handler.onError("Unknown type of message");
                 return -1;
-                break;                
-        }        
+                break;
+        }
         return offset + msgLen;
     }
-    
+
 private:
+
     template<class T>
-    bool inline decode(const char* buff, size_t msgLen){
-        auto message = std::make_shared<T>();                
+    bool inline decode(const char* buff, size_t msgLen) {
+        auto message = std::make_shared<T>();
         if(message->decode(buff, msgLen)){
             handler.onMessage(message);
             return true;

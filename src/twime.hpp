@@ -5,31 +5,34 @@ using namespace std;
 
 namespace twime
 {
-class TwimeConnector{
+class TwimeConnector {
 
- 
-    Session session;
-    
+   Session session;
+
    public:
     TwimeConnector() 
     : session()
     {}
 
-    void setUser(const string mUser){
+    void setUser(const string mUser) {
          session.setUser(mUser);
     }
 
-    int connect(const string& mIp, const unsigned int& mPort){
+    int connect(const string& mIp, const unsigned int& mPort) {
           return session.connect(mIp, mPort);
     }
 
-    int disconnect(){
+    int disconnect() {
           return session.disconnect();
     }
-      
-      bool isRunning(){
+
+    bool isRunning() {
           return session.isRunning();
     }
 
+    template<class MessageType>
+    int send(MessageType& message) {
+       return session.sendCommand(message);
+    }
 };
 };

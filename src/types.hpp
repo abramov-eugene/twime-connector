@@ -3,12 +3,17 @@
 namespace twime{
 
 typedef unsigned char uint8;
+typedef char int8;
 typedef unsigned short int uint16;
 typedef unsigned int uint32;
 typedef unsigned long uint64;
 typedef unsigned long timestamp_t;
 typedef uint32 Qty;
-    
+typedef float Decimal5;
+
+const uint64 nullValueUint64 = 18446744073709551615;
+
+
 enum FixMessageType {
     ESTABLISH = 5000,
     ESTABLISHMENT_ACK = 5001,
@@ -32,8 +37,8 @@ enum Side : uint8 {
 };
 
 enum ClientFlags : uint8 {
-    DONT_CHECK_LIMITS = 0,
-    NCC_REQUEST = 1
+    DONT_CHECK_LIMITS = 0x1,
+    NCC_REQUEST = 0x2
 };
 
 };

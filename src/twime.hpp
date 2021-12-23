@@ -34,5 +34,9 @@ class TwimeConnector {
     int send(MessageType& message) {
        return session.sendCommand(message);
     }
+
+    Status getStatus() {
+       return session.getStatus();
+    }
 };
 };

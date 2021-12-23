@@ -183,6 +183,10 @@ class Session {
        return status != Status::DISCONNECTED;
    }
 
+   Status getStatus() const {
+       return status;
+   }
+
    int send(const char *buff, const int len) {
        printBuff(">>", buff, len);
        boost::asio::write(sock, boost::asio::buffer(buff, len));
@@ -245,7 +249,7 @@ private:
         outStream << temp << "Buff(" << len << "):";
         for(int i = 0; i< len; ++i) {
             unsigned char c = buff[i];
-            outStream << std::setfill('0') << std::setw(3) << static_cast<uint16>(c) << ((i == 7) ? " = " : ":");
+            outStream << std::hex << std::setfill('0') << std::setw(2) << static_cast<uint16>(c) << ((i == 7) ? " = " : ":");
         }
         outStream << std::endl;
     }

@@ -73,7 +73,7 @@ public:
     }
     
     size_t encode(char* buff, const size_t len){
-        setLengthMessage(12+20);
+        setLengthMessage(8+4+20);
         size_t offset = FixMessage::encode_header(buff, len);
         offset = ParserUtils::pack<timestamp_t>(buff, len, offset, timestamp);
         if (offset == 0)
@@ -243,33 +243,58 @@ class NewOrderSingle : public FixMessage {
 
     NewOrderSingle()
     : FixMessage(FixMessageType::NEW_ORDER_SINGLE)
+    , clOrderId{0}
+    , clOrderLinkId{0}
+    , expDate{nullValueUint64}
+    , flags{ClientFlags::DONT_CHECK_LIMITS}
     {}
 
-    NewOrderSingle(uint64 mClOrdId, uint64 mClOrdLinkId, uint32 mSecurityId, Side mSide, TimeInForce mTif, float mPrice, Qty mQty, const std::string mAccount,  uint64 mExpDate = 0)
-    : FixMessage(FixMessageType::NEW_ORDER_SINGLE)
-    , clOrderId{mClOrdId}
-    , clOrderLinkId{mClOrdLinkId}
-    , price{mPrice}
-    , securityId{mSecurityId}
-    , side{mSide}
-    , tif{mTif}
-    , orderQty{mQty}
-    , flags{ClientFlags::DONT_CHECK_LIMITS}
-    , account{mAccount}
-    , expDate{mExpDate}
-    {
+    NewOrderSingle& setClOrdId(uint16 mClOrdId) {
+       clOrderId = mClOrdId;
+       return *this;
     }
-    
+
+    NewOrderSingle& setClOrdLinkId(uint16 mClOrdLinkId) {
+       clOrderLinkId = mClOrdLinkId;
+       return *this;
+    }
+
+    NewOrderSingle& setSecurityId(uint32 mSecurityId) {
+       securityId = mSecurityId;
+       return *this;
+    }
+
+    NewOrderSingle& setQty(uint32 mQty) {
+       orderQty = mQty;
+       return *this;
+    }
+
+    NewOrderSingle& setTimeInForce(TimeInForce mTif) {
+       tif = mTif;
+       return *this;
+    }
+
+    NewOrderSingle& setSide(Side mSide) {
+       side = mSide;
+       return *this;
+    }
+
+    NewOrderSingle& setAccount(const std::string& mAccount) {
+       account = mAccount;
+       return *this;
+    }
+
+    NewOrderSingle& setPrice(float mPrice) {
+       price = mPrice;
+       return *this;
+    }
+
     size_t encode(char* buff, const size_t len) {
-        setLengthMessage(8);//todo
+        setLengthMessage(47);
         size_t offset = FixMessage::encode_header(buff, len);
         offset = ParserUtils::pack<uint64>(buff, len, offset, clOrderId);
-        if (offset == 0)
-           return -1;
-        if (tif == TimeInForce::GTD) {
-           offset = ParserUtils::pack<uint64>(buff, len, offset, expDate);
-        }
-        offset = ParserUtils::pack<float>(buff, len, offset, price);
+        offset = ParserUtils::pack<uint64>(buff, len, offset, expDate);
+        offset = ParserUtils::pack(buff, len, offset, price);
         offset = ParserUtils::pack<uint32>(buff, len, offset, securityId);
         offset = ParserUtils::pack<uint32>(buff, len, offset, clOrderLinkId);
         offset = ParserUtils::pack<uint32>(buff, len, offset, orderQty);
@@ -277,6 +302,7 @@ class NewOrderSingle : public FixMessage {
         offset = ParserUtils::pack<Side>(buff, len, offset, side);
         offset = ParserUtils::pack<ClientFlags>(buff, len, offset, flags);
         offset = ParserUtils::packChar(buff, len, offset, account.c_str(), 7);
+//        assert(offset == getLengthMessage);
         return offset;
     }
 

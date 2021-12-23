@@ -28,9 +28,20 @@ int main(int argc, char **argv) {
         connector.connect(string(argv[2]), atoi(argv[3]));
         while(connector.isRunning()) {
             sleep(1);
-            NewOrderSingle nos;
+            if (connector.getStatus() == Status::AUTHORIZED) {
+               NewOrderSingle nos;
 
-            connector.send(nos);
+               nos.setClOrdId(24)
+                  .setClOrdLinkId(1)
+                  .setSecurityId(12345)
+                  .setQty(1)
+                  .setPrice(100.0)
+                  .setSide(Side::BUY)
+                  .setTimeInForce(TimeInForce::IOC)
+                  .setAccount("ABCDEFG");
+
+               connector.send(nos);
+            }
         }
     }
     catch(std::exception& ex){

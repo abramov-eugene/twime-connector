@@ -6,12 +6,13 @@
 
 using namespace twime;
 
-TwimeConnector connector;
+shared_ptr<TwimeConnector> connector;
+shared_ptr<Logger> logger;
 
 void handler(int) {
-    if (connector.isRunning()){
-        cerr << "Connector is stopping!!!" << endl;
-        connector.disconnect();
+    if (connector->isRunning()){
+        logger->log("Connector is stopping!!!");
+        connector->disconnect();
     }
 }
 
@@ -23,12 +24,15 @@ int main(int argc, char **argv) {
         return -1;
     }
 
+    logger = std::make_shared<Logger>("twime.log");
+    connector = std::make_shared<TwimeConnector>(*logger);
+
     try {
-        connector.setUser(string(argv[1]));
-        connector.connect(string(argv[2]), atoi(argv[3]));
-        while(connector.isRunning()) {
-            sleep(1);
-            if (connector.getStatus() == Status::AUTHORIZED) {
+        connector->setUser(string(argv[1]));
+        connector->connect(string(argv[2]), atoi(argv[3]));
+        while(connector->isRunning()) {
+            sleep(1); //delay for NOS-request
+            /*if (connector->getStatus() == Status::AUTHORIZED) {
                NewOrderSingle nos;
 
                nos.setClOrdId(24)
@@ -40,13 +44,13 @@ int main(int argc, char **argv) {
                   .setTimeInForce(TimeInForce::IOC)
                   .setAccount("ABCDEFG");
 
-               connector.send(nos);
-            }
+               connector->send(nos);
+            }*/
         }
     }
     catch(std::exception& ex){
-        cerr << "Exception:" << ex.what();
-        connector.disconnect();
+        std::cerr << "Exception:" << ex.what() << std::endl;
+        connector->disconnect();
     }
     return 0;
 }

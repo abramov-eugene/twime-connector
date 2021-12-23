@@ -7,6 +7,7 @@
 #include <boost/thread.hpp>
 #include "messages.hpp"
 #include "parser.hpp"
+#include "logger.hpp"
 
 using namespace boost::asio;
 using namespace boost::asio::ip;
@@ -16,8 +17,11 @@ namespace twime
 {
 enum Status {DISCONNECTED=0, CONNECTING=1, CONNECTED=2, AUTHORIZED=3, DISCONNECTING=4};
 
+template<class Handler>
 class Session {
    Status status;
+   Handler& handler;
+   Logger& logger;
    io_service service;
    deadline_timer timer;
    tcp::socket sock;
@@ -42,8 +46,10 @@ class Session {
    unsigned int port;
    std::ofstream outStream;
    public:
-   Session() 
+   Session(Handler& mHandler, Logger& mLogger) 
    : status(Status::DISCONNECTED)
+   , handler(mHandler)
+   , logger(mLogger)
    , service()
    , timer(service, boost::posix_time::seconds(2))
    , sock(service)
@@ -64,19 +70,16 @@ class Session {
    , parser(*this)
    , ip("")
    , port(0)
-   , outStream()
    {
        sendBuff = new char [MAX_BUFF_SIZE];
        recvBuff = new char [MAX_RECV_SIZE];
        timer.async_wait(boost::bind(&Session::onTimer, this));
-       outStream.open("twime.log", std::ofstream::out);
    }
    
    ~Session() {
        timer.cancel();
        service.stop();
        serviceThread.join();
-       outStream.close();
        if (sendBuff)
            delete [] sendBuff;
        if (recvBuff)
@@ -87,24 +90,19 @@ class Session {
         userName = mUser;
     }
 
-    void log(const string& msg) {
-        outStream << "[" << time(nullptr) << "]" << msg << endl;
-        outStream.flush();
-    }
-
     void onTimer() {
         timestamp_t now = DateTimeUtils::now();
         switch (status){
             case Status::CONNECTING:{
-                log("Connecting...");
+                logger.log("Connecting...");
                 if (DateTimeUtils::delta(now, lastConnecting) > reconnectTimeoutSec){
                     tcp::endpoint endpoint(address::from_string(ip),port);
-                    log("Connect:" + ip + ":" + std::to_string(port));
+                    logger.log("Connect:" + ip + ":" + std::to_string(port));
                     try{
                         sock.connect(endpoint);
                     }
                     catch(const std::exception& ex){
-                        log("Connection error:" + string( ex.what()));
+                        logger.log("Connection error:" + string( ex.what()));
                         sock.close();
                     }
                     lastConnecting = DateTimeUtils::now();
@@ -118,7 +116,7 @@ class Session {
             }
             case Status::CONNECTED:{
                 if (DateTimeUtils::delta(now, lastEstablish) > reestablishTimeoutSec){
-                    log("Establish sended");
+                    logger.log("Establish sended");
                     Establish est(keepAlive, userName);
                     sendCommand(est);
                     lastEstablish = DateTimeUtils::now();
@@ -128,13 +126,13 @@ class Session {
             case Status::AUTHORIZED:{
                 timestamp_t now = DateTimeUtils::now();
                 if (DateTimeUtils::delta(now, lastSended) >= (keepAlive/1000)-1){
-                    log("Heartbeat sended");
+                    logger.log("Sequence sended");
                     Sequence seq(sendSeqNum);
                     sendCommand(seq);
                     lastSended = DateTimeUtils::now();
                 }
                 if (keepAliveServer != 0 && DateTimeUtils::delta(now, lastRecv) >=2*keepAliveServer/1000){
-                    log("Heartbeat from server missed");
+                    logger.log("Heartbeat from server missed");
                     close();
                 }
                 break;
@@ -158,17 +156,17 @@ class Session {
         ip = mIp;
         if (status == Status::DISCONNECTED) {
             status = Status::CONNECTING;
-            log("Connecting state");
+            logger.log("Connecting state");
         }
         return 0;
    }
 
    int disconnect() {
-        log("Disconnect");
+        logger.log("Disconnect");
         if (status == Status::AUTHORIZED) {
             Terminate term(0);
             sendCommand(term);
-            log("Terminate sended");
+            logger.log("Terminate sended");
         }
         else if (status == Status::CONNECTED 
                 || status == Status::CONNECTING) {
@@ -188,7 +186,7 @@ class Session {
    }
 
    int send(const char *buff, const int len) {
-       printBuff(">>", buff, len);
+       logger.printBuff(">>", buff, len);
        boost::asio::write(sock, boost::asio::buffer(buff, len));
        lastSended = DateTimeUtils::now();
        return 0;
@@ -201,28 +199,33 @@ class Session {
             if (len > 0)
                 return send(sendBuff, len);
             else
-                log("Error: Can't encode command");
+                logger.log("Error: Can't encode command");
         } else {
-            log("Error: Can't send message. Status is not ready");
+            logger.log("Error: Can't send message. Status is not ready");
         }
         return -1;
    }
 
     void onError(const string error) {
-        log("Error message parsing:" + error);
+        logger.log("Error message parsing:" + error);
     }
 
     void onMessage(const shared_ptr<EstablishmentReject> reject){
-        log("EstalishReject received. Reject:" + to_string(reject->getRejectCode()));
+        logger.log("EstalishReject received. Reject:" + to_string(reject->getRejectCode()));
+        disconnect();
+    }
+
+    void onMessage(const shared_ptr<SessionReject> reject){
+        logger.log("SessionReject received. Reject:" + to_string(reject->getRejectCode()));
         disconnect();
     }
 
     void onMessage(const shared_ptr<Sequence>){
-        log("Heartbeat received");
+        logger.log("Sequence received");
     }
 
     void onMessage(const shared_ptr<Terminate> msg) {
-        log("Terminate received: " + to_string(msg->getTerminationCode()));
+        logger.log("Terminate received: " + to_string(msg->getTerminationCode()));
         close();
     }
 
@@ -230,7 +233,14 @@ class Session {
         status = Status::AUTHORIZED;
         keepAliveServer = msg->getKeepAlive();
         nextSeqNum = msg->getNextSeqNum();
-        log("EstablishmentAck received: " + to_string(keepAliveServer) );
+        logger.log("EstablishmentAck received: " + to_string(keepAliveServer) );
+    }
+
+
+    template<class MessageType>
+    void onMessage(const shared_ptr<MessageType> msg) {
+        logger.log("Application message received");
+        handler.onMessage(msg);
     }
 
 private:
@@ -241,22 +251,12 @@ private:
         if (sock.is_open()) {
             sock.close(ignored);
         }
-    }
-
-    void printBuff(const char* temp, const char *buff, int len) {
-        if (len == 0)
-            return;
-        outStream << temp << "Buff(" << len << "):";
-        for(int i = 0; i< len; ++i) {
-            unsigned char c = buff[i];
-            outStream << std::hex << std::setfill('0') << std::setw(2) << static_cast<uint16>(c) << ((i == 7) ? " = " : ":");
-        }
-        outStream << std::endl;
+        logger.log("Session closed");
     }
 
     void onRead(const boost::system::error_code& error, size_t bytes){
         lastRecv = DateTimeUtils::now();
-        printBuff("<<", recvBuff, bytes);
+        logger.printBuff("<<", recvBuff, bytes);
         if (!error) {
             int ind = 0;
             size_t offset = 0;
@@ -269,7 +269,7 @@ private:
                 }
             }
         } else {
-            log("Error: onRead error:" + string(error.message()) + " sock:" + to_string(sock.is_open()) );
+            logger.log("Error: onRead error:" + string(error.message()) + " sock:" + to_string(sock.is_open()) );
         }
         init_read();
     }
@@ -284,6 +284,11 @@ private:
                                  boost::bind(&Session::onRead, this, 
                                  boost::asio::placeholders::error, 
                                  boost::asio::placeholders::bytes_transferred));
+        } else {
+           //logger.log("Session is disconnected. Can't init read");
+           //if (!sock.is_open()) {
+           //      status = Status::CONNECTING;
+           //}
         }
     }
 };

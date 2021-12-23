@@ -199,6 +199,75 @@ public:
     }
 };
 
+class BusinessMessageReject: public FixMessage{
+    uint64 clOrdId;
+    timestamp_t timestamp;
+    uint8 rejReasonCode;
+public:
+    
+    BusinessMessageReject()
+    : FixMessage(FixMessageType::BUSINESS_MESSAGE_REJECT)
+    , clOrdId{0}
+    , timestamp{0}
+    , rejReasonCode{0} {
+    }
+
+    
+    uint8 getRejectCode() const {
+        return rejReasonCode;
+    }
+    
+    size_t encode(char*, const size_t) {
+        return 0;
+    }
+    
+    int decode(const char *buff, const size_t size) {
+        size_t offset = header_size;
+        offset = ParserUtils::unpack<uint64>(buff, size, offset, clOrdId);
+        if (offset == 0)
+            return -1;
+        offset = ParserUtils::unpack<timestamp_t>(buff, size, offset, timestamp);
+        if (offset == 0)
+            return -1;
+        offset = ParserUtils::unpack<uint8>(buff, size, offset, rejReasonCode);
+        return offset;
+    }
+};
+
+class SessionReject: public FixMessage{
+    uint64 clOrdId;
+    uint32 refTagId;
+    uint8 sessionRejectReason;
+public:
+    
+    SessionReject()
+    : FixMessage(FixMessageType::SESSION_REJECT)
+    , clOrdId{0}
+    , refTagId{0}
+    , sessionRejectReason{0} {
+    }
+
+    uint8 getRejectCode() const {
+        return sessionRejectReason;
+    }
+    
+    size_t encode(char*, const size_t) {
+        return 0;
+    }
+    
+    int decode(const char *buff, const size_t size) {
+        size_t offset = header_size;
+        offset = ParserUtils::unpack<uint64>(buff, size, offset, clOrdId);
+        if (offset == 0)
+            return -1;
+        offset = ParserUtils::unpack<uint32>(buff, size, offset, refTagId);
+        if (offset == 0)
+            return -1;
+        offset = ParserUtils::unpack<uint8>(buff, size, offset, sessionRejectReason);
+        return offset;
+    }
+};
+
 class Sequence : public FixMessage{
     uint64 nextSeqNum;
     public:
@@ -290,7 +359,7 @@ class NewOrderSingle : public FixMessage {
     }
 
     size_t encode(char* buff, const size_t len) {
-        setLengthMessage(47);
+        setLengthMessage(46);
         size_t offset = FixMessage::encode_header(buff, len);
         offset = ParserUtils::pack<uint64>(buff, len, offset, clOrderId);
         offset = ParserUtils::pack<uint64>(buff, len, offset, expDate);
@@ -302,7 +371,6 @@ class NewOrderSingle : public FixMessage {
         offset = ParserUtils::pack<Side>(buff, len, offset, side);
         offset = ParserUtils::pack<ClientFlags>(buff, len, offset, flags);
         offset = ParserUtils::packChar(buff, len, offset, account.c_str(), 7);
-//        assert(offset == getLengthMessage);
         return offset;
     }
 

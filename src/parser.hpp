@@ -62,6 +62,12 @@ class Parser {
             case FixMessageType::SEQUENCE:
                 decode<Sequence>(buff, msgLen);
                 break;
+            case FixMessageType::BUSINESS_MESSAGE_REJECT:
+                decode<BusinessMessageReject>(buff, msgLen);
+                break;
+            case FixMessageType::SESSION_REJECT:
+                decode<SessionReject>(buff, msgLen);
+                break;
             default:
                 msg = "Unknown type of message. TemplateId:" + to_string(templateId);
                 handler.onError("Unknown type of message");

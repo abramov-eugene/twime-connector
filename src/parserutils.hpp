@@ -28,14 +28,14 @@ struct ParserUtils{
     }
 
     static size_t pack(char*buff, const size_t maxLen, const size_t offset, const float& value){
-        constexpr size_t value_size = sizeof(uint64) + sizeof(int8);
+        constexpr size_t value_size = sizeof(uint64);// + sizeof(int8);
         if (offset + value_size >= maxLen){
             return 0;
         }
         const uint64 mantissa = static_cast<uint64>(value * 100000.0);
         const int8 exp = -5;
         memcpy(buff + offset, &mantissa, sizeof(uint64));
-        memcpy(buff + offset + sizeof(uint64), &exp, sizeof(int8));
+        //memcpy(buff + offset + sizeof(uint64), &exp, sizeof(int8));
         return offset + value_size;
     }
 

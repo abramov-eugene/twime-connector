@@ -1,17 +1,21 @@
 #pragma once
 
 #include "session.hpp"
+#include "logger.hpp"
+
 using namespace std;
 
 namespace twime
 {
 class TwimeConnector {
 
-   Session session;
+   Session<TwimeConnector> session;
+   Logger& logger;
 
    public:
-    TwimeConnector() 
-    : session()
+    TwimeConnector(Logger& mLogger) 
+    : session(*this, mLogger)
+    , logger(mLogger)
     {}
 
     void setUser(const string mUser) {
@@ -37,6 +41,12 @@ class TwimeConnector {
 
     Status getStatus() {
        return session.getStatus();
+    }
+
+
+    void onMessage(const shared_ptr<BusinessMessageReject> msg) {
+       auto error = "BusinessMessageReject. RejectCode:" + to_string(msg->getRejectCode());
+       logger.log(error);
     }
 };
 };
